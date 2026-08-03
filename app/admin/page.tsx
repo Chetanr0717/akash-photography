@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import QRCode from "qrcode";
 import { supabase } from "../lib/supabase";
 
 type Photo = {
@@ -30,7 +31,6 @@ export default function AdminPage() {
 
   const [creatingClient, setCreatingClient] = useState(false);
   const [uploading, setUploading] = useState(false);
-
   const [uploadProgress, setUploadProgress] = useState("");
 
   const [deletingId, setDeletingId] =
@@ -39,45 +39,139 @@ export default function AdminPage() {
   const cloudName = "utdfz02n";
   const uploadPreset = "akash_photos";
 
+  // IMPORTANT:
+  // Agar Vercel website ka URL alag hai,
+  // to yahan apna actual website URL likhna.
+  const websiteUrl =
+    "https://akash-photography.vercel.app";
+
+  function getClientGalleryLink(
+    clientId: string
+  ) {
+    return `${websiteUrl}/client?client=${encodeURIComponent(
+      clientId
+    )}`;
+  }
+
+  async function downloadClientQR(
+    client: Client
+  ) {
+    try {
+      const galleryLink =
+        getClientGalleryLink(
+          client.client_id
+        );
+
+      const qrDataUrl =
+        await QRCode.toDataURL(
+          galleryLink,
+          {
+            width: 900,
+            margin: 2,
+            errorCorrectionLevel: "H",
+            color: {
+              dark: "#000000",
+              light: "#ffffff",
+            },
+          }
+        );
+
+      const link =
+        document.createElement("a");
+
+      link.href =
+        qrDataUrl;
+
+      const cleanName =
+        client.client_name
+          .replace(
+            /[^a-z0-9]/gi,
+            "-"
+          )
+          .toLowerCase();
+
+      link.download =
+        `${cleanName}-gallery-qr.png`;
+
+      document.body.appendChild(
+        link
+      );
+
+      link.click();
+
+      link.remove();
+
+      setMessage(
+        `QR Code downloaded for ${client.client_name}!`
+      );
+    } catch (error) {
+      console.log(error);
+
+      setMessage(
+        "QR Code generate nahi hua. Dobara try karo."
+      );
+    }
+  }
+
   async function loadClients() {
-    const { data, error } = await supabase
-      .from("clients")
-      .select("*")
-      .order("id", { ascending: false });
+    const { data, error } =
+      await supabase
+        .from("clients")
+        .select("*")
+        .order("id", {
+          ascending: false,
+        });
 
     if (error) {
       console.log(error);
-      setMessage("Clients load nahi hue.");
+
+      setMessage(
+        "Clients load nahi hue."
+      );
+
       return;
     }
 
-    const loadedClients = data || [];
+    const loadedClients =
+      data || [];
 
-    setClients(loadedClients);
+    setClients(
+      loadedClients
+    );
 
     if (
       !selectedClientId &&
       loadedClients.length > 0
     ) {
       setSelectedClientId(
-        loadedClients[0].client_id
+        loadedClients[0]
+          .client_id
       );
     }
   }
 
   async function loadPhotos() {
-    const { data, error } = await supabase
-      .from("photos")
-      .select("*")
-      .order("id", { ascending: false });
+    const { data, error } =
+      await supabase
+        .from("photos")
+        .select("*")
+        .order("id", {
+          ascending: false,
+        });
 
     if (error) {
       console.log(error);
-      setMessage("Photos load nahi hui.");
+
+      setMessage(
+        "Photos load nahi hui."
+      );
+
       return;
     }
 
-    setPhotos(data || []);
+    setPhotos(
+      data || []
+    );
   }
 
   useEffect(() => {
@@ -101,16 +195,27 @@ export default function AdminPage() {
     }
   }
 
-  function createClientId(name: string) {
-    const cleanName = name
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
+  function createClientId(
+    name: string
+  ) {
+    const cleanName =
+      name
+        .toLowerCase()
+        .trim()
+        .replace(
+          /[^a-z0-9]+/g,
+          "-"
+        )
+        .replace(
+          /^-+|-+$/g,
+          ""
+        );
 
     const randomNumber =
       Math.floor(
-        1000 + Math.random() * 9000
+        1000 +
+          Math.random() *
+            9000
       );
 
     return `${cleanName}-${randomNumber}`;
@@ -120,7 +225,8 @@ export default function AdminPage() {
     return String(
       Math.floor(
         100000 +
-          Math.random() * 900000
+          Math.random() *
+            900000
       )
     );
   }
@@ -142,12 +248,17 @@ export default function AdminPage() {
 
     try {
       const newClientId =
-        createClientId(cleanName);
+        createClientId(
+          cleanName
+        );
 
       const newPassword =
         createPassword();
 
-      const { data, error } =
+      const {
+        data,
+        error,
+      } =
         await supabase
           .from("clients")
           .insert({
@@ -166,12 +277,15 @@ export default function AdminPage() {
       }
 
       setClients(
-        (oldClients) => [
+        (
+          oldClients
+        ) => [
           data,
           ...oldClients,
         ]
       );
 
+      // New client automatically select hoga
       setSelectedClientId(
         data.client_id
       );
@@ -188,7 +302,9 @@ export default function AdminPage() {
         "Client create nahi hua. Dobara try karo."
       );
     } finally {
-      setCreatingClient(false);
+      setCreatingClient(
+        false
+      );
     }
   }
 
@@ -196,7 +312,10 @@ export default function AdminPage() {
     file: File
   ): Promise<File> {
     return new Promise(
-      (resolve, reject) => {
+      (
+        resolve,
+        reject
+      ) => {
         const image =
           new Image();
 
@@ -205,133 +324,153 @@ export default function AdminPage() {
             file
           );
 
-        image.onload = () => {
-          const maxWidth = 2500;
-          const maxHeight = 2500;
+        image.onload =
+          () => {
+            const maxWidth =
+              2500;
 
-          let width =
-            image.width;
+            const maxHeight =
+              2500;
 
-          let height =
-            image.height;
+            let width =
+              image.width;
 
-          if (
-            width > maxWidth ||
-            height > maxHeight
-          ) {
-            const ratio =
-              Math.min(
-                maxWidth / width,
-                maxHeight / height
+            let height =
+              image.height;
+
+            if (
+              width >
+                maxWidth ||
+              height >
+                maxHeight
+            ) {
+              const ratio =
+                Math.min(
+                  maxWidth /
+                    width,
+                  maxHeight /
+                    height
+                );
+
+              width =
+                Math.round(
+                  width *
+                    ratio
+                );
+
+              height =
+                Math.round(
+                  height *
+                    ratio
+                );
+            }
+
+            const canvas =
+              document.createElement(
+                "canvas"
               );
 
-            width = Math.round(
-              width * ratio
-            );
+            canvas.width =
+              width;
 
-            height =
-              Math.round(
-                height * ratio
+            canvas.height =
+              height;
+
+            const context =
+              canvas.getContext(
+                "2d"
               );
-          }
 
-          const canvas =
-            document.createElement(
-              "canvas"
+            if (
+              !context
+            ) {
+              URL.revokeObjectURL(
+                imageUrl
+              );
+
+              reject(
+                new Error(
+                  "Image processing failed"
+                )
+              );
+
+              return;
+            }
+
+            context.fillStyle =
+              "white";
+
+            context.fillRect(
+              0,
+              0,
+              width,
+              height
             );
 
-          canvas.width =
-            width;
-
-          canvas.height =
-            height;
-
-          const context =
-            canvas.getContext(
-              "2d"
+            context.drawImage(
+              image,
+              0,
+              0,
+              width,
+              height
             );
 
-          if (!context) {
+            canvas.toBlob(
+              (
+                blob
+              ) => {
+                URL.revokeObjectURL(
+                  imageUrl
+                );
+
+                if (
+                  !blob
+                ) {
+                  reject(
+                    new Error(
+                      "Image compression failed"
+                    )
+                  );
+
+                  return;
+                }
+
+                const compressedFile =
+                  new File(
+                    [
+                      blob,
+                    ],
+                    file.name.replace(
+                      /\.[^/.]+$/,
+                      ".jpg"
+                    ),
+                    {
+                      type:
+                        "image/jpeg",
+                    }
+                  );
+
+                resolve(
+                  compressedFile
+                );
+              },
+              "image/jpeg",
+              0.88
+            );
+          };
+
+        image.onerror =
+          () => {
             URL.revokeObjectURL(
               imageUrl
             );
 
             reject(
               new Error(
-                "Image processing failed"
+                "Image load failed"
               )
             );
-
-            return;
-          }
-
-          context.fillStyle =
-            "white";
-
-          context.fillRect(
-            0,
-            0,
-            width,
-            height
-          );
-
-          context.drawImage(
-            image,
-            0,
-            0,
-            width,
-            height
-          );
-
-          canvas.toBlob(
-            (blob) => {
-              URL.revokeObjectURL(
-                imageUrl
-              );
-
-              if (!blob) {
-                reject(
-                  new Error(
-                    "Image compression failed"
-                  )
-                );
-
-                return;
-              }
-
-              const compressedFile =
-                new File(
-                  [blob],
-                  file.name.replace(
-                    /\.[^/.]+$/,
-                    ".jpg"
-                  ),
-                  {
-                    type:
-                      "image/jpeg",
-                  }
-                );
-
-              resolve(
-                compressedFile
-              );
-            },
-            "image/jpeg",
-            0.88
-          );
-        };
-
-        image.onerror = () => {
-          URL.revokeObjectURL(
-            imageUrl
-          );
-
-          reject(
-            new Error(
-              "Image load failed"
-            )
-          );
-        };
+          };
 
         image.src =
           imageUrl;
@@ -344,12 +483,13 @@ export default function AdminPage() {
   ) {
     const files =
       Array.from(
-        event.target.files ||
-          []
+        event.target
+          .files || []
       );
 
     if (
-      files.length === 0
+      files.length ===
+      0
     ) {
       return;
     }
@@ -364,9 +504,15 @@ export default function AdminPage() {
       return;
     }
 
-    setUploading(true);
+    setUploading(
+      true
+    );
+
     setMessage("");
-    setUploadProgress("");
+
+    setUploadProgress(
+      ""
+    );
 
     try {
       for (
@@ -376,7 +522,9 @@ export default function AdminPage() {
         index++
       ) {
         const originalFile =
-          files[index];
+          files[
+            index
+          ];
 
         setUploadProgress(
           `Photo ${
@@ -455,7 +603,9 @@ export default function AdminPage() {
                 selectedClientId,
             });
 
-        if (error) {
+        if (
+          error
+        ) {
           throw error;
         }
       }
@@ -464,7 +614,9 @@ export default function AdminPage() {
 
       const selectedClient =
         clients.find(
-          (client) =>
+          (
+            client
+          ) =>
             client.client_id ===
             selectedClientId
         );
@@ -510,7 +662,9 @@ export default function AdminPage() {
         "Kya aap ye photo delete karna chahte hain?"
       );
 
-    if (!answer) {
+    if (
+      !answer
+    ) {
       return;
     }
 
@@ -535,7 +689,9 @@ export default function AdminPage() {
           id
         );
 
-    if (error) {
+    if (
+      error
+    ) {
       console.log(
         error
       );
@@ -581,7 +737,7 @@ export default function AdminPage() {
 
         <div className="mx-auto max-w-6xl">
 
-          <p className="text-center text-yellow-400">
+          <p className="text-center text-sm tracking-[0.4em] text-yellow-400">
             AKASH PHOTOGRAPHY
           </p>
 
@@ -590,7 +746,7 @@ export default function AdminPage() {
           </h1>
 
           <p className="mt-4 text-center text-gray-400">
-            Create clients and upload photos
+            Create clients, generate QR and upload photos
           </p>
 
           <div className="mx-auto mt-8 grid max-w-4xl gap-6 md:grid-cols-2">
@@ -642,7 +798,7 @@ export default function AdminPage() {
               </button>
 
               <p className="mt-3 text-center text-xs text-gray-500">
-                Client ID and 6-digit password will be generated automatically.
+                Client ID and password will be generated automatically.
               </p>
 
             </div>
@@ -695,7 +851,9 @@ export default function AdminPage() {
                         {
                           client.client_name
                         }
+
                         {" — "}
+
                         {
                           client.client_id
                         }
@@ -774,7 +932,7 @@ export default function AdminPage() {
           <div className="mx-auto mt-10 max-w-4xl">
 
             <h2 className="text-center text-2xl font-bold">
-              Client Login Details
+              Client Login Details & QR
             </h2>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -826,6 +984,42 @@ export default function AdminPage() {
 
                         </span>
 
+                      </p>
+
+                      <div className="mt-5 grid gap-3 sm:grid-cols-2">
+
+                        <a
+                          href={
+                            getClientGalleryLink(
+                              client.client_id
+                            )
+                          }
+                          target="_blank"
+                          rel="noreferrer"
+                          className="rounded-xl border border-yellow-400 px-4 py-3 text-center font-bold text-yellow-400"
+                        >
+
+                          Open Gallery
+
+                        </a>
+
+                        <button
+                          onClick={() =>
+                            downloadClientQR(
+                              client
+                            )
+                          }
+                          className="rounded-xl bg-yellow-400 px-4 py-3 font-bold text-black"
+                        >
+
+                          Download QR
+
+                        </button>
+
+                      </div>
+
+                      <p className="mt-3 text-center text-xs text-gray-500">
+                        QR scan karne par Client ID automatically fill ho jayegi.
                       </p>
 
                     </div>
@@ -967,7 +1161,7 @@ export default function AdminPage() {
 
       <div className="mx-auto max-w-md">
 
-        <p className="text-center text-yellow-400">
+        <p className="text-center text-sm tracking-[0.4em] text-yellow-400">
           AKASH PHOTOGRAPHY
         </p>
 

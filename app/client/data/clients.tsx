@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "../../lib/supabase";
 
 type Photo = {
@@ -19,19 +19,42 @@ type Client = {
 export default function ClientGallery() {
   const [clientId, setClientId] = useState("");
   const [password, setPassword] = useState("");
+
   const [loggedIn, setLoggedIn] = useState(false);
 
-  const [clientName, setClientName] = useState("");
+  const [clientName, setClientName] =
+    useState("");
 
-  const [photos, setPhotos] = useState<Photo[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [loggingIn, setLoggingIn] = useState(false);
-  const [message, setMessage] = useState("");
+  const [photos, setPhotos] =
+    useState<Photo[]>([]);
+
+  const [loading, setLoading] =
+    useState(false);
+
+  const [message, setMessage] =
+    useState("");
+
+  // QR link se Client ID automatically fill hoga
+  useEffect(() => {
+    const params =
+      new URLSearchParams(
+        window.location.search
+      );
+
+    const qrClientId =
+      params.get("client");
+
+    if (qrClientId) {
+      setClientId(qrClientId);
+      setMessage(
+        "Client ID QR code se automatically fill ho gaya. Ab password enter karein."
+      );
+    }
+  }, []);
 
   async function clientLogin() {
-    const cleanClientId = clientId
-      .trim()
-      .toLowerCase();
+    const cleanClientId =
+      clientId.trim();
 
     const cleanPassword =
       password.trim();
@@ -47,23 +70,26 @@ export default function ClientGallery() {
       return;
     }
 
-    setLoggingIn(true);
+    setLoading(true);
     setMessage("");
 
     try {
-      const { data: client, error: clientError } =
-        await supabase
-          .from("clients")
-          .select("*")
-          .eq(
-            "client_id",
-            cleanClientId
-          )
-          .eq(
-            "client_password",
-            cleanPassword
-          )
-          .maybeSingle();
+      // Client ID aur password database me check karega
+      const {
+        data: client,
+        error: clientError,
+      } = await supabase
+        .from("clients")
+        .select("*")
+        .eq(
+          "client_id",
+          cleanClientId
+        )
+        .eq(
+          "client_password",
+          cleanPassword
+        )
+        .maybeSingle();
 
       if (clientError) {
         throw clientError;
@@ -74,6 +100,8 @@ export default function ClientGallery() {
           "Wrong Client ID or Password."
         );
 
+        setLoading(false);
+
         return;
       }
 
@@ -81,59 +109,41 @@ export default function ClientGallery() {
         client.client_name
       );
 
-      setLoggedIn(true);
-
-      await loadPhotos(
-        client.client_id
-      );
-    } catch (error) {
-      console.log(error);
-
-      setMessage(
-        "Login failed. Please try again."
-      );
-    } finally {
-      setLoggingIn(false);
-    }
-  }
-
-  async function loadPhotos(
-    selectedClientId: string
-  ) {
-    setLoading(true);
-
-    const { data, error } =
-      await supabase
+      // Sirf login wale client ki photos load hongi
+      const {
+        data: clientPhotos,
+        error: photoError,
+      } = await supabase
         .from("photos")
         .select("*")
         .eq(
           "client_id",
-          selectedClientId
+          client.client_id
         )
-        .order(
-          "id",
-          {
-            ascending: false,
-          }
-        );
+        .order("id", {
+          ascending: false,
+        });
 
-    if (error) {
+      if (photoError) {
+        throw photoError;
+      }
+
+      setPhotos(
+        clientPhotos || []
+      );
+
+      setLoggedIn(true);
+
+      setMessage("");
+    } catch (error) {
       console.log(error);
 
       setMessage(
-        "Photos load nahi hui. Please try again."
+        "Login nahi hua. Please dobara try karein."
       );
-
+    } finally {
       setLoading(false);
-
-      return;
     }
-
-    setPhotos(
-      data || []
-    );
-
-    setLoading(false);
   }
 
   function logout() {
@@ -148,6 +158,13 @@ export default function ClientGallery() {
     setPhotos([]);
 
     setMessage("");
+
+    // URL se QR wala client parameter remove karega
+    window.history.replaceState(
+      {},
+      "",
+      "/client"
+    );
   }
 
   async function downloadPhoto(
@@ -201,30 +218,33 @@ export default function ClientGallery() {
       console.log(error);
 
       alert(
-        "Download nahi hua. Please try again."
+        "Download nahi hua. Please dobara try karein."
       );
     }
   }
 
-  if (!loggedIn) {
+  // LOGIN PAGE
+  if (
+    !loggedIn
+  ) {
     return (
-      <main className="min-h-screen bg-black px-6 py-12 text-white">
+      <main className="min-h-screen bg-black px-4 py-10 text-white sm:px-6 sm:py-12">
 
         <div className="mx-auto max-w-md">
 
-          <p className="text-center text-yellow-400">
+          <p className="text-center text-sm font-semibold tracking-[0.25em] text-yellow-400">
             AKASH PHOTOGRAPHY
           </p>
 
-          <h1 className="mt-3 text-center text-4xl font-bold">
-            Client Gallery Login
+          <h1 className="mt-3 text-center text-3xl font-bold sm:text-4xl">
+            Client Gallery
           </h1>
 
-          <p className="mt-4 text-center text-gray-400">
+          <p className="mt-4 text-center text-sm text-gray-400 sm:text-base">
             Enter your Client ID and Password
           </p>
 
-          <div className="mt-10 rounded-2xl border border-zinc-700 bg-zinc-900 p-7">
+          <div className="mt-8 rounded-2xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl sm:mt-10 sm:p-7">
 
             <label className="text-sm text-gray-300">
               Client ID
@@ -233,13 +253,18 @@ export default function ClientGallery() {
             <input
               type="text"
               value={clientId}
-              onChange={(event) =>
+              onChange={(
+                event
+              ) => {
                 setClientId(
                   event.target.value
-                )
-              }
+                );
+
+                setMessage("");
+              }}
               placeholder="Enter Client ID"
-              className="mt-2 w-full rounded-xl border border-zinc-700 bg-black px-5 py-4 text-white outline-none"
+              autoComplete="username"
+              className="mt-2 w-full rounded-xl border border-zinc-700 bg-black px-4 py-4 text-white outline-none transition focus:border-yellow-400"
             />
 
             <label className="mt-5 block text-sm text-gray-300">
@@ -249,13 +274,18 @@ export default function ClientGallery() {
             <input
               type="password"
               value={password}
-              onChange={(event) =>
+              onChange={(
+                event
+              ) => {
                 setPassword(
                   event.target.value
-                )
-              }
-              placeholder="Enter Password"
-              onKeyDown={(event) => {
+                );
+
+                setMessage("");
+              }}
+              onKeyDown={(
+                event
+              ) => {
                 if (
                   event.key ===
                   "Enter"
@@ -263,7 +293,9 @@ export default function ClientGallery() {
                   clientLogin();
                 }
               }}
-              className="mt-2 w-full rounded-xl border border-zinc-700 bg-black px-5 py-4 text-white outline-none"
+              placeholder="Enter Password"
+              autoComplete="current-password"
+              className="mt-2 w-full rounded-xl border border-zinc-700 bg-black px-4 py-4 text-white outline-none transition focus:border-yellow-400"
             />
 
             <button
@@ -271,24 +303,44 @@ export default function ClientGallery() {
                 clientLogin
               }
               disabled={
-                loggingIn
+                loading
               }
-              className="mt-6 w-full rounded-xl bg-yellow-400 px-6 py-4 font-bold text-black disabled:opacity-50"
+              className="mt-6 w-full rounded-xl bg-yellow-400 px-6 py-4 font-bold text-black transition hover:bg-yellow-300 disabled:cursor-not-allowed disabled:opacity-60"
             >
-
-              {loggingIn
-                ? "Checking..."
-                : "Open My Gallery"}
-
+              {
+                loading
+                  ? "Checking..."
+                  : "Open My Gallery"
+              }
             </button>
 
-            {message && (
-              <p className="mt-5 text-center text-red-400">
-                {message}
-              </p>
-            )}
+            {
+              message && (
+
+                <p
+                  className={`mt-5 rounded-xl border p-3 text-center text-sm ${
+                    message.includes(
+                      "automatically"
+                    )
+                      ? "border-yellow-400/40 bg-yellow-400/10 text-yellow-300"
+                      : "border-red-500/40 bg-red-500/10 text-red-400"
+                  }`}
+                >
+
+                  {
+                    message
+                  }
+
+                </p>
+
+              )
+            }
 
           </div>
+
+          <p className="mt-5 text-center text-xs text-gray-600">
+            Scan the QR code to automatically fill the Client ID.
+          </p>
 
         </div>
 
@@ -296,85 +348,102 @@ export default function ClientGallery() {
     );
   }
 
+  // GALLERY PAGE
   return (
-    <main className="min-h-screen bg-black px-6 py-12 text-white">
+    <main className="min-h-screen bg-black px-4 py-10 text-white sm:px-6 sm:py-12">
 
       <div className="mx-auto max-w-6xl">
 
-        <p className="text-center text-yellow-400">
+        <p className="text-center text-sm font-semibold tracking-[0.25em] text-yellow-400">
           AKASH PHOTOGRAPHY
         </p>
 
-        <h1 className="mt-3 text-center text-4xl font-bold">
-          {clientName}'s Photo Gallery
+        <h1 className="mt-3 text-center text-3xl font-bold sm:text-4xl">
+          {clientName
+            ? `${clientName}'s Gallery`
+            : "My Photo Gallery"}
         </h1>
 
-        <p className="mt-4 text-center text-gray-400">
+        <p className="mt-4 text-center text-sm text-gray-400 sm:text-base">
           Your beautiful memories
         </p>
 
-        <div className="mt-8 flex justify-center">
+        <div className="mt-7 flex justify-center">
 
           <button
-            onClick={logout}
-            className="rounded-xl border border-yellow-400 px-6 py-3 font-bold text-yellow-400"
+            onClick={
+              logout
+            }
+            className="rounded-xl border border-yellow-400 px-6 py-3 font-bold text-yellow-400 transition hover:bg-yellow-400 hover:text-black"
           >
             Logout
           </button>
 
         </div>
 
-        {loading && (
-          <p className="mt-10 text-center text-yellow-400">
-            Loading your photos...
-          </p>
-        )}
+        {
+          photos.length ===
+            0 && (
 
-        {!loading &&
-          photos.length === 0 && (
-            <p className="mt-10 text-center text-gray-400">
-              No photos available yet.
-            </p>
-          )}
+            <div className="mx-auto mt-12 max-w-md rounded-2xl border border-zinc-700 bg-zinc-900 p-8 text-center">
 
-        <div className="mt-10 grid gap-6 sm:grid-cols-2 md:grid-cols-3">
+              <h2 className="text-xl font-bold text-yellow-400">
+                No Photos Yet
+              </h2>
 
-          {photos.map(
-            (photo) => (
+              <p className="mt-3 text-sm text-gray-400">
+                Your photos will appear here after the photographer uploads them.
+              </p>
 
-              <div
-                key={photo.id}
-                className="overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900"
-              >
+            </div>
 
-                <img
-                  src={
-                    photo.image_url
+          )
+        }
+
+        <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+
+          {
+            photos.map(
+              (
+                photo
+              ) => (
+
+                <div
+                  key={
+                    photo.id
                   }
-                  alt="Client Photo"
-                  loading="lazy"
-                  className="h-80 w-full object-cover"
-                />
+                  className="overflow-hidden rounded-2xl border border-zinc-700 bg-zinc-900 shadow-xl"
+                >
 
-                <div className="p-4">
-
-                  <button
-                    onClick={() =>
-                      downloadPhoto(
-                        photo
-                      )
+                  <img
+                    src={
+                      photo.image_url
                     }
-                    className="w-full rounded-xl bg-yellow-400 px-5 py-3 text-center font-bold text-black"
-                  >
-                    ⬇ Download Photo
-                  </button>
+                    alt="Client photo"
+                    loading="lazy"
+                    className="h-72 w-full object-cover sm:h-80"
+                  />
+
+                  <div className="p-4">
+
+                    <button
+                      onClick={() =>
+                        downloadPhoto(
+                          photo
+                        )
+                      }
+                      className="w-full rounded-xl bg-yellow-400 px-5 py-3 font-bold text-black transition hover:bg-yellow-300"
+                    >
+                      ⬇ Download Photo
+                    </button>
+
+                  </div>
 
                 </div>
 
-              </div>
-
+              )
             )
-          )}
+          }
 
         </div>
 
